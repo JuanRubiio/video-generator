@@ -27,9 +27,10 @@ OUTPUT_VIDEO_DIR = "video_output"
 OUTPUT_TRANSCRIPTS_DIR = "transcripts_output"
 OUTPUT_VOICE = "ru-RU-DmitryNeural"  # Voz de salida, puedes cambiarla según tus necesidades
 
+INPUT_TEXT_DIR = "text_input"  # Directorio de texto de entrada
 INPUT_TEXT_FILE = "texto.txt"
 INPUT_LANGUAGE = "es-ES"  # Idioma de entrada, puedes cambiarlo según tus necesidades
-INPUT_IMAGES_DIR = "imagenes"  # Directorio de imágenes de entrada
+INPUT_IMAGES_DIR = "images_input"  # Directorio de imágenes de entrada
 INPUT_IMAGES_NUMBER = 6  # Número de imágenes a generar
 FONT_SIZE = 30  # Tamaño de fuente para los subtítulos
 
@@ -38,6 +39,8 @@ os.makedirs(OUTPUT_AUDIO_DIR, exist_ok=True)
 os.makedirs(OUTPUT_SUBTITLES_DIR, exist_ok=True)
 os.makedirs(OUTPUT_VIDEO_DIR, exist_ok=True)
 os.makedirs(OUTPUT_TRANSCRIPTS_DIR, exist_ok=True)
+os.makedirs(INPUT_TEXT_DIR, exist_ok=True)
+os.makedirs(INPUT_IMAGES_DIR, exist_ok=True)
 
 VIDEO_SIZE = (1280, 720)  # Tamaño estándar para YouTube HD
 
@@ -192,7 +195,7 @@ async def main():
     """Función principal para la generación del video."""
     # Leer el texto a generar desde el archivo texto.txt
     try:
-        with open(INPUT_TEXT_FILE, "r", encoding="utf-8") as f:
+        with open(INPUT_TEXT_DIR + '/' + INPUT_TEXT_FILE, "r", encoding="utf-8") as f:
             texto_a_generar = f.read().strip()
     except Exception as e:
         logging.error(f"No se pudo leer el archivo {INPUT_TEXT_FILE}: {e}")
