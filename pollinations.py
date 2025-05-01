@@ -146,56 +146,40 @@ class PollinationsAPI:
             print(f"Error translating text: {e}")
             return None
 
-    def extract_scene_description(self, chapter_text):
-        """Extract key visual elements from the chapter text"""
-        lines = chapter_text.split('\n')
-        title = lines[0] if lines else ""
-        
-        # Get the first few paragraphs for context
-        content = ' '.join(lines[1:4]) if len(lines) > 1 else ""
-        
-        # Now we can use English words since we're working with translated text
-        locations = [word for word in content.split() if any(loc in word.lower() for loc in 
-                    ['forest', 'house', 'village', 'city', 'church', 'lake', 'river', 'mountain', 'room', 'castle'])]
-        
-        time_weather = [word for word in content.split() if any(desc in word.lower() for desc in 
-                       ['night', 'day', 'morning', 'evening', 'dark', 'cold', 'snow', 'rain', 'fog', 'mist'])]
-        
-        return {
-            'title': title,
-            'location': locations[0] if locations else '',
-            'time_weather': time_weather[0] if time_weather else '',
-            'content': content[:200]  # First 200 characters for context
-        }
+    def synthesize_chapter(self, chapter_text, model="openai"):
+        """Generate a concise visual description of the chapter's main scene"""
+        try:
+            system_prompt = "You are a visual scene director. Given this chapter of a story, create a single sentence (max 50 words) describing the most impactful or atmospheric scene that would best represent this chapter visually. Focus on mood, setting, and key visual elements. Do not explain, just describe the scene."
+            
+            encoded_prompt = urllib.parse.quote(chapter_text)
+            encoded_system = urllib.parse.quote(system_prompt)
+
+            params = {
+                'model': model,
+                'system': encoded_system
+            }
+
+            url = f"{self.base_url_text}/{encoded_prompt}"
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+            
+            return response.text.strip()
+        except requests.exceptions.RequestException as e:
+            print(f"Error synthesizing chapter: {e}")
+            return None
 
     def generate_chapter_image(self, chapter_text):
-        """Generate an image based on the chapter content"""
-        scene = self.extract_scene_description(chapter_text)
-        
-        # Create a more specific and varied prompt
-        prompt_elements = [
-            "Atmospheric horror scene",
-            f"in {scene['location']}" if scene['location'] else "in a dark Russian setting",
-            f"during {scene['time_weather']}" if scene['time_weather'] else "at night",
-            f"from the scene: {scene['content']}"
-        ]
-        
-        image_prompt = ", ".join(filter(None, prompt_elements))
-        
-        # Add artistic style variations
-        styles = [
-            "in the style of Russian Gothic art",
-            "like a dark oil painting",
-            "reminiscent of Soviet era horror",
-            "inspired by Slavic folk art"
-        ]
-        
-        # Use chapter number to select different style
-        style_index = len(self.extract_chapters(chapter_text)) % len(styles)
-        image_prompt += f", {styles[style_index]}"
-        
-        print(f"Generating image with prompt: {image_prompt}")  # Debug info
-        return self.generate_and_save_image(image_prompt)
+        """Generate an image based on the chapter's main scene"""
+        # Get the visual synthesis of the chapter
+        scene_description = self.synthesize_chapter(chapter_text)
+        if not scene_description:
+            return None
+
+        print(f"Generating image for scene: {scene_description}")
+        return self.generate_and_save_image(
+            prompt=f"cinematic scene: {scene_description}, atmospheric horror, dark mood lighting",
+            model="flux"
+        )
 
     def generate_and_save_text(self, prompt, model=None, system_prompt_file=None, seed=None):
         """Generate text and save it with chapters and images"""
