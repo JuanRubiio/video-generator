@@ -31,7 +31,7 @@ INPUT_TEXT_DIR = "text_input"  # Directorio de texto de entrada
 INPUT_TEXT_FILE = "texto.txt"
 INPUT_LANGUAGE = "es-ES"  # Idioma de entrada, puedes cambiarlo según tus necesidades
 INPUT_IMAGES_DIR = "images_input"  # Directorio de imágenes de entrada
-INPUT_IMAGES_NUMBER = 6  # Número de imágenes a generar
+INPUT_IMAGES_NUMBER = 5  # Número de imágenes a generar
 FONT_SIZE = 30  # Tamaño de fuente para los subtítulos
 
 # Asegurar que los directorios de salida existan
