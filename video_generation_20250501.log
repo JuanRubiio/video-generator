@@ -1,0 +1,13 @@
+2025-05-01 10:45:24,425 - INFO - Generando audio para el texto en 'audio_output\audio_20250501_104524.mp3'
+2025-05-01 10:45:25,807 - INFO - Audio generado exitosamente en 'audio_output\audio_20250501_104524.mp3'
+2025-05-01 10:45:25,807 - INFO - Esperando a que el archivo de audio 'audio_output\audio_20250501_104524.mp3' se genere completamente.
+2025-05-01 10:45:25,807 - INFO - Esperando archivo 'audio_output\audio_20250501_104524.mp3' (timeout=60s, stable_checks=5, check_interval=0.5s)
+2025-05-01 10:45:28,358 - INFO - Archivo 'audio_output\audio_20250501_104524.mp3' está listo para usar.
+2025-05-01 10:45:28,358 - INFO - Archivo de audio 'audio_output\audio_20250501_104524.mp3' generado completamente. Procediendo con la transcripción.
+2025-05-01 10:45:28,358 - INFO - Transcribiendo audio desde 'audio_output\audio_20250501_104524.mp3'
+2025-05-01 10:47:28,970 - INFO - Transcripción completada. Se encontraron 14 segmentos. Guardando en 'subtitles_output\subtitles_20250501_104528.srt' y 'transcripts_output\transcript_20250501_104528.txt'
+2025-05-01 10:47:29,073 - INFO - Creando video 'video_output\video_20250501_104729.mp4' con 6 imágenes y subtítulos.
+2025-05-01 10:47:35,139 - INFO - Creando 14 clips de subtítulos.
+2025-05-01 10:47:35,606 - INFO - Clips de subtítulos creados correctamente.
+2025-05-01 10:50:50,423 - INFO - Video 'video_output\video_20250501_104729.mp4' creado exitosamente.
+2025-05-01 10:50:50,470 - INFO - Proceso completado. Video guardado en: 'video_output\video_20250501_104729.mp4', Subtítulos (opcionalmente guardados en): 'subtitles_output\subtitles_20250501_104528.srt', Audio guardado en: 'audio_output\audio_20250501_104524.mp3'
