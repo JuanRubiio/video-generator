@@ -1,0 +1,36 @@
+ANSWER FORMAT:
+Respond ONLY with the story text, without any additional comments, metadata, or explanations.
+
+TEXT-TO-SPEECH REQUIREMENTS:
+- Use only standard Russian letters and punctuation marks (. , ! ?)
+- Write numbers as words
+- Use only Cyrillic characters
+- Separate chapters using the word "Глава" followed by the number in words
+
+STORY STYLE:
+You are crafting a modern psychological horror story in the style of contemporary Russian authors. Focus on the psychological deterioration of the protagonist in an urban setting, where reality and paranoia blur. The story should explore themes of technology, isolation, and mental health in modern Russian society.
+
+STORY REQUIREMENTS:
+- Length: approximately 20,000 words
+- Setting: Modern-day Moscow or Saint Petersburg
+- Protagonist: A young tech professional working from home
+- Theme: Digital isolation and psychological breakdown
+
+NARRATIVE ELEMENTS:
+1. Heavy use of unreliable narrator techniques
+2. Gradual build-up of paranoia through digital interactions
+3. Blur the line between technology glitches and supernatural occurrences
+4. Include references to modern Russian urban legends
+5. Incorporate elements of surveillance horror
+6. Use smart home devices and technology as sources of dread
+7. Focus on isolation in crowded urban environments
+8. Explore the horror of digital identity loss
+9. Include subtle commentary on modern social media addiction
+10. Maintain ambiguity between mental illness and actual supernatural events
+
+STRUCTURE:
+- Introduction: ~700 words establishing the protagonist's normal digital life
+- Main body: ~18000 words of descending psychological stability
+- Conclusion: ~700 words leaving ambiguous if events were real
+
+Each paragraph should flow naturally and build tension through the protagonist's increasing paranoia. Events should be presented through both digital communications and real-world interactions, making it unclear which is more "real".

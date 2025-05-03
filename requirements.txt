@@ -1,3 +1,4 @@
 edge_tts
 moviepy
 openai-whisper
+aiohttp

@@ -2,35 +2,35 @@ import requests
 import json
 import os
 from datetime import datetime
-import urllib.request
+import urllib
 import argparse
+from utils import setup_logger, retry_on_429
+import aiohttp
+import asyncio  # Añadir esta importación
+from config import IMAGE_HEIGHT, IMAGE_WIDTH, POLLINATIONS_CONFIG
 
 class PollinationsAPI:
-    def __init__(self, referrer=None):
-        self.base_url_image = "https://image.pollinations.ai"
-        self.base_url_text = "https://text.pollinations.ai"
-        self.referrer = referrer
+    def __init__(self, project_manager):
+        self.logger = setup_logger(__name__)
+        self.base_url_image = POLLINATIONS_CONFIG['image_base_url']
+        self.base_url_text = POLLINATIONS_CONFIG['text_base_url']
+        self.project_manager = project_manager
+        self.referrer = "VideoGenerator"  # Añadido el referrer faltante
         
-        # Create necessary directories
-        self.images_dir = "images_input"
-        self.texts_dir = "text_input"
-        self.prompts_dir = "system_prompts"
-        os.makedirs(self.images_dir, exist_ok=True)
-        os.makedirs(self.texts_dir, exist_ok=True)
-        os.makedirs(self.prompts_dir, exist_ok=True)
-
     def load_system_prompt(self, prompt_file):
         """Load system prompt from a file"""
         try:
-            file_path = os.path.join(self.prompts_dir, prompt_file)
+            file_path = os.path.join("system_prompts", prompt_file)
             with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read().strip()
         except Exception as e:
-            print(f"Error loading system prompt: {e}")
+            self.logger.error(f"Error loading system prompt: {e}")
             return None
 
-    def generate_image(self, prompt, model="flux", width=1280, height=720, seed=None, nologo=True, private=False):
+    @retry_on_429()
+    async def generate_image(self, prompt, model="flux", width=IMAGE_WIDTH, height=IMAGE_HEIGHT, seed=None, nologo=True, private=False):
         """Generate an image using the Pollinations API"""
+        self.logger.info(f"Generating image with prompt: {prompt}")
         params = {
             'prompt': prompt,
             'model': model,
@@ -44,11 +44,16 @@ class PollinationsAPI:
         if self.referrer:
             params['referrer'] = self.referrer
             
-        response = requests.get(f"{self.base_url_image}/prompt/{prompt}", params=params)
-        return response.url if response.status_code == 200 else None
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{self.base_url_image}/prompt/{prompt}", params=params) as response:
+                if response.status == 200:
+                    return str(response.url)
+        return None
 
-    def generate_text(self, prompt, model="openai", system_prompt_file=None, seed=None):
+    @retry_on_429()
+    async def generate_text(self, prompt, model="openai", system_prompt_file=None, seed=None):
         """Generate text using the Pollinations API"""
+        self.logger.info(f"Generating text with prompt: {prompt}")
         try:
             # Load system prompt from file if provided
             system_prompt = None
@@ -67,43 +72,156 @@ class PollinationsAPI:
                 params['seed'] = seed
             if encoded_system:
                 params['system'] = encoded_system
-            if self.referrer:
-                params['referrer'] = self.referrer
 
             # Make the request with the correct URL format
             url = f"{self.base_url_text}/{encoded_prompt}"
-            response = requests.get(url, params=params)
-            response.raise_for_status()
-            
-            return response.text
-        except requests.exceptions.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params) as response:
+                    response.raise_for_status()
+                    return await response.text()
+        except aiohttp.ClientError as e:
             print(f"Error generating text: {e}")
             return None
 
-    def generate_and_save_image(self, prompt, model="flux", width=1280, height=720, seed=None, nologo=True, private=False):
-        """Generate an image and save it to the images directory"""
+    async def generate_and_save_image_to_path(self, prompt, save_path):
+        """Generate image and save to specific path"""
         try:
-            # Get the image URL
-            image_url = self.generate_image(prompt, model, width, height, seed, nologo, private)
-            if image_url:
-                # Get next image number
-                existing_images = len([f for f in os.listdir(self.images_dir) if f.startswith("imagen")])
-                image_number = existing_images + 1
-                image_path = os.path.join(self.images_dir, f"imagen{image_number}.png")
-                
-                # Download image using requests
-                response = requests.get(image_url, stream=True)
-                response.raise_for_status()  # Raise an exception for bad status codes
-                
-                # Save the image
-                with open(image_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                        
-                return image_path
+            self.logger.info(f"Generating image with prompt: {prompt}")
+            params = {
+                'prompt': prompt,
+                'model': "flux",
+                'width': IMAGE_WIDTH,
+                'height': IMAGE_HEIGHT,
+                'nologo': 'true',
+                'private': 'false',
+                'referrer': self.referrer
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{self.base_url_image}/prompt/{prompt}", params=params) as response:
+                    if response.status == 200:
+                        image_url = str(response.url)
+                        async with session.get(image_url) as img_response:
+                            img_response.raise_for_status()
+                            with open(save_path, 'wb') as f:
+                                while True:
+                                    chunk = await img_response.content.read(8192)
+                                    if not chunk:
+                                        break
+                                    f.write(chunk)
+                            return save_path
             return None
-        except requests.exceptions.RequestException as e:
-            print(f"Error downloading image: {e}")
+        except Exception as e:
+            self.logger.error(f"Error saving image: {e}")
+            return None
+
+    async def generate_chapter_image(self, chapter_text):
+        """Generate an image based on the chapter's main scene"""
+        scene_description = await self.synthesize_chapter(chapter_text)
+        if not scene_description:
+            return None
+
+        self.logger.info(f"Generating image for scene: {scene_description}")
+        return await self.generate_and_save_image_to_path(
+            f"cinematic scene: {scene_description}, atmospheric horror, dark mood lighting",
+            os.path.join(
+                self.project_manager.get_path('images'),
+                f"chapter_{len(os.listdir(self.project_manager.get_path('images'))) + 1}.png"
+            )
+        )
+
+    async def generate_and_save_text(self, prompt, model=None, system_prompt_file=None, seed=None):
+        """Generate text and save it with chapters and images"""
+        try:
+            text = await self.generate_text(prompt, model, system_prompt_file, seed)
+            if not text:
+                self.logger.error("Failed to generate initial text")
+                return None
+
+            complete_story_path = os.path.join(
+                self.project_manager.get_path('script'), 
+                "complete_story_ru.txt"
+            )
+            with open(complete_story_path, "w", encoding="utf-8") as f:
+                f.write(text)
+            
+            chapters = self.extract_chapters(text)
+            chapter_info = []
+            
+            for i, chapter in enumerate(chapters, 1):
+                self.logger.info(f"\nProcessing chapter {i}...")
+                try:
+                    # Save Russian version
+                    chapter_ru_path = os.path.join(
+                        self.project_manager.get_path('script'),
+                        f"chapter_{i}_ru.txt"
+                    )
+                    with open(chapter_ru_path, "w", encoding="utf-8") as f:
+                        f.write(chapter)
+                    
+                    # Process chapter with retries
+                    max_retries = 3
+                    chapter_processed = False
+                    
+                    for attempt in range(max_retries):
+                        try:
+                            self.logger.info(f"Processing chapter {i} attempt {attempt + 1}/{max_retries}")
+                            
+                            # Translation
+                            chapter_en = await self.translate_text(chapter)
+                            if not chapter_en:
+                                raise Exception(f"Translation failed for chapter {i}")
+                            
+                            chapter_en_path = os.path.join(
+                                self.project_manager.get_path('script'),
+                                f"chapter_{i}_en.txt"
+                            )
+                            with open(chapter_en_path, "w", encoding="utf-8") as f:
+                                f.write(chapter_en)
+                            
+                            # Image generation
+                            image_path = await self.generate_chapter_image(chapter_en)
+                            if not image_path:
+                                raise Exception(f"Image generation failed for chapter {i}")
+                            
+                            chapter_info.append({
+                                'text_ru_path': chapter_ru_path,
+                                'text_en_path': chapter_en_path,
+                                'image_path': image_path
+                            })
+                            
+                            chapter_processed = True
+                            break
+                            
+                        except Exception as e:
+                            self.logger.error(f"Attempt {attempt + 1} failed for chapter {i}: {e}")
+                            if attempt < max_retries - 1:
+                                self.logger.info(f"Waiting 5 seconds before retry...")
+                                await asyncio.sleep(5)
+                            else:
+                                self.logger.error(f"Failed to process chapter {i} after {max_retries} attempts")
+                                return None
+                    
+                    if not chapter_processed:
+                        self.logger.error(f"Failed to process chapter {i}")
+                        return None
+                        
+                except Exception as e:
+                    self.logger.error(f"Unexpected error processing chapter {i}: {e}")
+                    return None
+            
+            # Save chapter information
+            info_path = os.path.join(self.project_manager.current_project, "story_info.json")
+            with open(info_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    'complete_story_ru': complete_story_path,
+                    'chapters': chapter_info
+                }, f, indent=2)
+            
+            return self.project_manager.current_project
+            
+        except Exception as e:
+            self.logger.error(f"Error in generate_and_save_text: {e}")
             return None
 
     def extract_chapters(self, text):
@@ -124,8 +242,10 @@ class PollinationsAPI:
             
         return chapters
 
-    def translate_text(self, text, model="openai"):
+    @retry_on_429()
+    async def translate_text(self, text, model="openai"):
         """Translate text from Russian to English using the API"""
+        self.logger.info("Translating text from Russian to English")
         try:
             system_prompt = "You are a professional translator. Translate the following Russian text to English, maintaining the same structure and paragraphs. Translate ONLY the content, do not add any comments or explanations."
             
@@ -138,16 +258,18 @@ class PollinationsAPI:
             }
 
             url = f"{self.base_url_text}/{encoded_prompt}"
-            response = requests.get(url, params=params)
-            response.raise_for_status()
-            
-            return response.text
-        except requests.exceptions.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params) as response:
+                    response.raise_for_status()
+                    return await response.text()
+        except aiohttp.ClientError as e:
             print(f"Error translating text: {e}")
             return None
 
-    def synthesize_chapter(self, chapter_text, model="openai"):
+    @retry_on_429()
+    async def synthesize_chapter(self, chapter_text, model="openai"):
         """Generate a concise visual description of the chapter's main scene"""
+        self.logger.info("Synthesizing chapter description")
         try:
             system_prompt = "You are a visual scene director. Given this chapter of a story, create a single sentence (max 50 words) describing the most impactful or atmospheric scene that would best represent this chapter visually. Focus on mood, setting, and key visual elements. Do not explain, just describe the scene."
             
@@ -160,86 +282,48 @@ class PollinationsAPI:
             }
 
             url = f"{self.base_url_text}/{encoded_prompt}"
-            response = requests.get(url, params=params)
-            response.raise_for_status()
-            
-            return response.text.strip()
-        except requests.exceptions.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params) as response:
+                    response.raise_for_status()
+                    return (await response.text()).strip()
+        except aiohttp.ClientError as e:
             print(f"Error synthesizing chapter: {e}")
             return None
 
-    def generate_chapter_image(self, chapter_text):
-        """Generate an image based on the chapter's main scene"""
-        # Get the visual synthesis of the chapter
-        scene_description = self.synthesize_chapter(chapter_text)
-        if not scene_description:
+    @retry_on_429()
+    async def synthesize_text(self, text, system_prompt=None, model="openai"):
+        """Generate a concise description or summary of the given text"""
+        self.logger.info("Synthesizing text description")
+        try:
+            if not system_prompt:
+                system_prompt = "Create a brief, impactful description from the following text. Focus on the most dramatic elements. Keep it concise and engaging."
+
+            encoded_prompt = urllib.parse.quote(text)
+            encoded_system = urllib.parse.quote(system_prompt)
+
+            params = {
+                'model': model,
+                'system': encoded_system
+            }
+
+            url = f"{self.base_url_text}/{encoded_prompt}"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params) as response:
+                    response.raise_for_status()
+                    return (await response.text()).strip()
+        except aiohttp.ClientError as e:
+            self.logger.error(f"Error synthesizing text: {e}")
             return None
 
-        print(f"Generating image for scene: {scene_description}")
-        return self.generate_and_save_image(
-            prompt=f"cinematic scene: {scene_description}, atmospheric horror, dark mood lighting",
-            model="flux"
-        )
-
-    def generate_and_save_text(self, prompt, model=None, system_prompt_file=None, seed=None):
-        """Generate text and save it with chapters and images"""
-        text = self.generate_text(prompt, model, system_prompt_file, seed)
-        if text:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            story_dir = os.path.join(self.texts_dir, f"story_{timestamp}")
-            os.makedirs(story_dir, exist_ok=True)
-            
-            # Save complete story in Russian
-            complete_story_path = os.path.join(story_dir, "complete_story_ru.txt")
-            with open(complete_story_path, "w", encoding="utf-8") as f:
-                f.write(text)
-            
-            chapters = self.extract_chapters(text)
-            chapter_info = []
-            
-            for i, chapter in enumerate(chapters, 1):
-                # Save Russian version
-                chapter_ru_path = os.path.join(story_dir, f"chapter_{i}_ru.txt")
-                with open(chapter_ru_path, "w", encoding="utf-8") as f:
-                    f.write(chapter)
-                
-                # Translate and save English version
-                print(f"Translating chapter {i}...")
-                chapter_en = self.translate_text(chapter)
-                chapter_en_path = os.path.join(story_dir, f"chapter_{i}_en.txt")
-                with open(chapter_en_path, "w", encoding="utf-8") as f:
-                    f.write(chapter_en)
-                
-                # Generate image using English translation
-                print(f"Generating image for chapter {i}...")
-                image_path = self.generate_chapter_image(chapter_en)
-                
-                chapter_info.append({
-                    'text_ru_path': chapter_ru_path,
-                    'text_en_path': chapter_en_path,
-                    'image_path': image_path
-                })
-            
-            # Save chapter information
-            info_path = os.path.join(story_dir, "story_info.json")
-            with open(info_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    'complete_story_ru': complete_story_path,
-                    'chapters': chapter_info
-                }, f, indent=2)
-            
-            return story_dir
-        return None
-
-def main():
+async def main():
     parser = argparse.ArgumentParser(description='Generate content using Pollinations API')
     subparsers = parser.add_subparsers(dest='command', help='Commands')
     
     # Image generation parser
     image_parser = subparsers.add_parser('image', help='Generate an image')
     image_parser.add_argument('prompt', help='Text prompt to generate the image')
-    image_parser.add_argument('--width', type=int, default=1280, help='Image width (default: 1280)')
-    image_parser.add_argument('--height', type=int, default=720, help='Image height (default: 720)')
+    image_parser.add_argument('--width', type=int, default=IMAGE_WIDTH, help='Image width (default: 1920)')
+    image_parser.add_argument('--height', type=int, default=IMAGE_HEIGHT, help='Image height (default: 1080)')
     image_parser.add_argument('--model', default='flux', help='Model to use (default: flux)')
     image_parser.add_argument('--seed', type=int, help='Seed for reproducible results')
     
@@ -255,7 +339,7 @@ def main():
 
     if args.command == 'image':
         print(f"Generating image for prompt: {args.prompt}")
-        image_path = api.generate_and_save_image(
+        image_path = await api.generate_and_save_image(
             prompt=args.prompt,
             model=args.model,
             width=args.width,
@@ -269,7 +353,7 @@ def main():
             
     elif args.command == 'text':
         print(f"Generating text for prompt: {args.prompt}")
-        story_dir = api.generate_and_save_text(
+        story_dir = await api.generate_and_save_text(
             prompt=args.prompt,
             model=args.model,
             system_prompt_file=args.system_prompt_file,
@@ -288,7 +372,8 @@ def main():
         parser.print_help()
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
 
 
 
