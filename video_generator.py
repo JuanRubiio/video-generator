@@ -2,6 +2,7 @@ import asyncio
 import edge_tts
 from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, TextClip, CompositeVideoClip, VideoFileClip
 from moviepy.video.fx.Resize import Resize
+from moviepy.video.fx import CrossFadeIn, CrossFadeOut, FadeIn, FadeOut, SlideIn, SlideOut
 import os
 import whisper
 import logging
@@ -9,6 +10,7 @@ from datetime import date, datetime
 import warnings
 from utils import setup_logger
 import config
+import random
 
 # Filtrar warnings de tipo UserWarning
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -234,28 +236,93 @@ class VideoGenerator:
             self.logger.error(f"Error in create_chapter_videos: {e}", exc_info=True)
             return None
 
+    def apply_random_transition(self, clip1, clip2, transition_type=None):
+        """Apply a random transition between two video clips"""
+        if transition_type is None:
+            transition_type = random.choice(list(config.VIDEO_TRANSITIONS.keys()))
+        
+        transition_config = config.VIDEO_TRANSITIONS[transition_type]
+        duration = transition_config['duration']
+        
+        try:
+            if transition_type == 'fade':
+                clip1 = CompositeVideoClip([clip1.with_effects([FadeOut(duration)])])
+                clip2 = CompositeVideoClip([clip2.with_effects([FadeIn(duration)])])
+                return clip1, clip2
+                
+            elif transition_type == 'fade_out_fade_in':
+                clip1 = CompositeVideoClip([clip1.with_effects([FadeOut(duration / 2)])])
+                clip2 = CompositeVideoClip([clip2.with_effects([FadeIn(duration / 2)])])
+                return clip1, clip2
+                
+            elif transition_type == 'crossfade':
+                clip1 = CompositeVideoClip([clip1.with_effects([CrossFadeOut(duration)])])
+                clip2 = CompositeVideoClip([clip2.with_effects([CrossFadeIn(duration)])])
+                return clip1, clip2
+                
+            elif transition_type == 'slide':
+                direction = transition_config.get('direction', 'left')
+                clip1 = CompositeVideoClip([clip1.with_effects([SlideOut(duration, direction)])])
+                clip2 = CompositeVideoClip([clip2.with_effects([SlideIn(duration, direction)])])
+                return clip1, clip2
+                
+            elif transition_type == 'wipe':
+                direction = transition_config.get('direction', 'right')
+                clip1 = CompositeVideoClip([clip1.with_effects([SlideOut(duration, direction)])])
+                clip2 = CompositeVideoClip([clip2.with_effects([SlideIn(duration, direction)])])
+                return clip1, clip2
+                
+        except Exception as e:
+            self.logger.warning(f"Error applying transition {transition_type}, falling back to cut: {e}")
+            return clip1, clip2
+
     def combine_chapter_videos(self, video_paths):
-        """Combine multiple video files into one"""
+        """Combine multiple video files into one with transitions"""
         try:
             output_video = os.path.join(
                 self.project_manager.get_path('video'),
                 "final_video.mp4"
             )
+            
+            self.logger.info("Loading video clips...")
             video_clips = [VideoFileClip(path) for path in video_paths]
-            final_video = concatenate_videoclips(video_clips)
+            final_clips = []
+            
+            self.logger.info("Applying transitions between chapters...")
+            for i in range(len(video_clips)):
+                if i == 0:
+                    # El primer clip se añade sin transición de entrada
+                    final_clips.append(video_clips[i])
+                    continue
+                    
+                # Aplicar transición entre clips
+                prev_clip, current_clip = self.apply_random_transition(
+                    final_clips[-1],
+                    video_clips[i]
+                )
+                
+                # Actualizar el clip anterior con la transición
+                final_clips[-1] = prev_clip
+                # Añadir el nuevo clip con su transición
+                final_clips.append(current_clip)
+            
+            self.logger.info("Concatenating clips with transitions...")
+            final_video = concatenate_videoclips(final_clips, method="compose")
+            
+            self.logger.info("Writing final video...")
             final_video.write_videofile(
-                output_video, 
+                output_video,
                 fps=config.VIDEO_FPS,
                 codec=config.VIDEO_CODECS['video'],
                 audio_codec=config.VIDEO_CODECS['audio']
             )
             
             # Cerrar los clips
-            for clip in video_clips:
+            for clip in video_clips + final_clips:
                 clip.close()
-                
+            
             return output_video
             
         except Exception as e:
-            logging.error(f"Error combining videos: {e}")
+            self.logger.error(f"Error combining videos: {e}")
             return None

@@ -17,6 +17,7 @@ SUBTITLE_STYLE = {
     'stroke_color': 'black',
     'stroke_width': 2,
     'position': ('center', 'bottom'), 
+    'margin': (0, 60),  # Margen vertical entre los subtítulos y la parte inferior
     'size': (1000, None),  # Ancho máximo para los subtítulos (ajustar según necesidad)
     'text_align': 'center',  # Alineación del texto
     'interline': -1,  # Espaciado entre líneas ligeramente reducido
@@ -64,4 +65,27 @@ IMAGE_HEIGHT = 1080  # Height for generated images
 RETRY_CONFIG = {
     'max_retries': 3,
     'delay': 5
+}
+
+# Video transitions
+VIDEO_TRANSITIONS = {
+    'fade': {
+        'duration': 1.0,
+        'color': 'black'
+    },
+    'fade_out_fade_in': {
+        'duration': 1.5,
+        'color': 'black'
+    },
+    'crossfade': {
+        'duration': 1.0
+    },
+    'slide': {
+        'duration': 1.0,
+        'direction': 'left'  # left, right, up, down
+    },
+    'wipe': {
+        'duration': 1.0,
+        'direction': 'right'
+    }
 }
