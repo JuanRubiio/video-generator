@@ -26,6 +26,7 @@ SUBTITLE_STYLE = {
 # Audio settings
 TTS_VOICE = "ru-RU-DmitryNeural"
 WHISPER_MODEL = "small"
+LANG_MODEL = "ru"
 
 # File paths and structure
 PROJECT_BASE_DIR = "projects"
