@@ -7,14 +7,16 @@ import os
 from utils import setup_logger
 from project_manager import ProjectManager
 from thumbnail_generator import ThumbnailGenerator
+from config import MUSIC_CONFIG
 
 class VideoCreationOrchestrator:
-    def __init__(self, interactive=False):
+    def __init__(self, interactive=False, music_style=None):
         self.project_manager = ProjectManager()
         self.pollinations = PollinationsAPI(self.project_manager)
         self.video_gen = VideoGenerator(self.project_manager)
         self.thumb_gen = ThumbnailGenerator(self.project_manager)
         self.interactive = interactive
+        self.music_style = music_style
         self.logger = setup_logger(__name__)
 
     async def wait_for_confirmation(self, message):
@@ -23,11 +25,11 @@ class VideoCreationOrchestrator:
         response = input(f"\n{message} (y/n): ")
         return response.lower() in ['y', 'yes', '']
 
-    async def create_story_and_images(self, prompt, system_prompt_file):
+    async def create_story_and_images(self, prompt, system_prompt_file, music_style):
         self.logger.info(f"Starting story generation with prompt: {prompt}")
         print("\nGenerating story and chapters...")
         # Crear nuevo proyecto
-        self.project_manager.create_project(prompt)
+        self.project_manager.create_project(prompt, music_style)
         story_dir = await self.pollinations.generate_and_save_text(
             prompt=prompt,
             system_prompt_file=system_prompt_file
@@ -68,9 +70,9 @@ class VideoCreationOrchestrator:
             return True
         return False
 
-    async def run(self, prompt, system_prompt_file):
+    async def run(self, prompt, system_prompt_file, music_style):
         self.logger.info("Starting video creation process")
-        story_info = await self.create_story_and_images(prompt, system_prompt_file)
+        story_info = await self.create_story_and_images(prompt, system_prompt_file, music_style)
         if not story_info:
             return False
 
@@ -84,11 +86,18 @@ def main():
                        help='System prompt file (default: russian_horror.txt)')
     parser.add_argument('--interactive', '-i', action='store_true',
                        help='Enable interactive mode with confirmations')
+    parser.add_argument('--music-style', 
+                       choices=list(MUSIC_CONFIG['styles'].keys()),
+                       default=MUSIC_CONFIG['default_style'],
+                       help='Style of background music')
     
     args = parser.parse_args()
     
-    orchestrator = VideoCreationOrchestrator(interactive=args.interactive)
-    asyncio.run(orchestrator.run(args.prompt, args.system_prompt))
+    orchestrator = VideoCreationOrchestrator(
+        interactive=args.interactive,
+        music_style=args.music_style
+    )
+    asyncio.run(orchestrator.run(args.prompt, args.system_prompt, args.music_style))
 
 if __name__ == "__main__":
     main()

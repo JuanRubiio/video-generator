@@ -12,7 +12,7 @@ class ProjectManager:
         self.current_project = None
         self.project_structure = PROJECT_DIRS
 
-    def create_project(self, prompt):
+    def create_project(self, prompt, music_style):
         """Create a new project directory with timestamp"""
         self.logger.info("\nCreating new project directory...")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -27,6 +27,7 @@ class ProjectManager:
         project_info = {
             'prompt': prompt,
             'creation_date': datetime.now().isoformat(),
+            'music_style': music_style,
         }
 
         with open(os.path.join(project_dir, 'project_info.json'), 'w', encoding='utf-8') as f:
@@ -81,7 +82,7 @@ class ProjectManager:
             self.logger.info("Generating description...")
             description = await generate_with_retry(
                 first_chapter,
-                f"Create a YouTube description for this horror story. Include: hook, synopsis, and call to action. Max 2000 chars."
+                f"Create a YouTube description for this story. Include: hook, synopsis, and call to action. Max 2000 chars."
             )
             if not description:
                 return None

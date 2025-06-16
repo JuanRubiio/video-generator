@@ -2,7 +2,7 @@ from pollinations import PollinationsAPI
 import os
 import requests
 from utils import setup_logger
-from config import VIDEO_SIZE, THUMBNAIL_SYSTEM_PROMPT
+from config import VIDEO_SIZE, THUMBNAIL_SYSTEM_PROMPT, POLLINATIONS_CONFIG
 
 class ThumbnailGenerator:
     def __init__(self, project_manager):
@@ -38,7 +38,7 @@ class ThumbnailGenerator:
                 prompt=f"YouTube thumbnail: {thumbnail_prompt}, dramatic lighting, cinematic, high contrast",
                 width=self.thumbnail_size[0],
                 height=self.thumbnail_size[1],
-                model="flux"
+                model=POLLINATIONS_CONFIG['default_model']
             )
 
             # Save thumbnail

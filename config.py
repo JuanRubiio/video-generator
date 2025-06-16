@@ -17,7 +17,7 @@ SUBTITLE_STYLE = {
     'stroke_color': 'black',
     'stroke_width': 2,
     'position': ('center', 'bottom'), 
-    'margin': (0, 60),  # Margen vertical entre los subtítulos y la parte inferior
+    'margin': (0, 0, 0, 60),  # Margen vertical entre los subtítulos y la parte inferior
     'size': (1000, None),  # Ancho máximo para los subtítulos (ajustar según necesidad)
     'text_align': 'center',  # Alineación del texto
     'interline': -1,  # Espaciado entre líneas ligeramente reducido
@@ -89,3 +89,28 @@ VIDEO_TRANSITIONS = {
         'direction': 'right'
     }
 }
+
+# Music settings
+MUSIC_CONFIG = {
+    'base_dir': 'music',
+    'styles': {
+        'horror': {
+            'volume': 0.3,  # 30% del volumen original
+            'fade_duration': 2.0  # segundos para fade in/out
+        },
+        'suspense': {
+            'volume': 0.25,
+            'fade_duration': 2.0
+        },
+        'ambient': {
+            'volume': 0.2,
+            'fade_duration': 1.5
+        },
+        'dark': {
+            'volume': 0.35,
+            'fade_duration': 2.0
+        }
+    },
+    'default_style': 'horror'
+}
+

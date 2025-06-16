@@ -17,6 +17,7 @@ class PollinationsAPI:
         self.project_manager = project_manager
         self.referrer = "VideoGenerator"  # Añadido el referrer faltante
         
+        
     def load_system_prompt(self, prompt_file):
         """Load system prompt from a file"""
         try:
@@ -37,7 +38,8 @@ class PollinationsAPI:
             'width': width,
             'height': height,
             'nologo': str(nologo).lower(),
-            'private': str(private).lower()
+            'private': str(private).lower(),
+            'enhance': 'true'
         }
         if seed is not None:
             params['seed'] = seed
@@ -89,7 +91,7 @@ class PollinationsAPI:
             self.logger.info(f"Generating image with prompt: {prompt}")
             params = {
                 'prompt': prompt,
-                'model': "flux",
+                'model': POLLINATIONS_CONFIG['default_model'],
                 'width': IMAGE_WIDTH,
                 'height': IMAGE_HEIGHT,
                 'nologo': 'true',

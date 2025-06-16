@@ -1,8 +1,9 @@
 import asyncio
 import edge_tts
-from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, TextClip, CompositeVideoClip, VideoFileClip
+from moviepy import ImageClip, AudioFileClip, concatenate_videoclips, TextClip, CompositeVideoClip, VideoFileClip, CompositeAudioClip, concatenate_audioclips
 from moviepy.video.fx.Resize import Resize
 from moviepy.video.fx import CrossFadeIn, CrossFadeOut, FadeIn, FadeOut, SlideIn, SlideOut
+from moviepy import AudioFileClip, afx
 import os
 import whisper
 import logging
@@ -16,11 +17,12 @@ import random
 warnings.filterwarnings("ignore", category=UserWarning)
 
 class VideoGenerator:
-    def __init__(self, project_manager):
+    def __init__(self, project_manager, music_style='horror'):
         self.project_manager = project_manager
         self.logger = setup_logger(__name__)
         self.VIDEO_SIZE = config.VIDEO_SIZE
         self.FONT_SIZE = config.FONT_SIZE
+        self.music_style = music_style
 
     async def generar_audio(self, texto, capitulo_num):
         """Genera un archivo de audio a partir de texto"""
@@ -115,7 +117,7 @@ class VideoGenerator:
             logging.error(f"Error al transcribir el audio '{audio_path}': {e}")
             return None, None
 
-    def crear_clips_de_subtitulos(self, subtitulos, tamano_video):
+    def crear_clips_de_subtitulos(self, subtitulos):
         """Crea clips de texto para los subtítulos."""
         clips_de_texto = []
         try:
@@ -130,6 +132,7 @@ class VideoGenerator:
                     color=config.SUBTITLE_STYLE['color'],
                     stroke_color=config.SUBTITLE_STYLE['stroke_color'],
                     stroke_width=config.SUBTITLE_STYLE['stroke_width'],
+                    margin=config.SUBTITLE_STYLE['margin'],
                     method=config.SUBTITLE_STYLE['method'],
                     size=config.SUBTITLE_STYLE['size'],
                     text_align=config.SUBTITLE_STYLE['text_align'],
@@ -168,7 +171,7 @@ class VideoGenerator:
                 ]
                 video_principal = concatenate_videoclips(clips_de_imagen)
                 video_principal = CompositeVideoClip([video_principal], size=self.VIDEO_SIZE)
-                clips_de_subtitulos = self.crear_clips_de_subtitulos(subtitulos, self.VIDEO_SIZE)
+                clips_de_subtitulos = self.crear_clips_de_subtitulos(subtitulos)
                 video_final = CompositeVideoClip([video_principal] + clips_de_subtitulos, size=self.VIDEO_SIZE)
                 video_final.audio = audio_clip  # Asigna el audio aquí
                 video_final.write_videofile(output_video, fps=24, codec='libx264', audio_codec='aac')
@@ -276,8 +279,91 @@ class VideoGenerator:
             self.logger.warning(f"Error applying transition {transition_type}, falling back to cut: {e}")
             return clip1, clip2
 
+    def get_random_music_track(self):
+        """Selecciona una pista de música aleatoria del estilo especificado"""
+        try:
+            style_dir = os.path.join('music', self.music_style)
+            if not os.path.exists(style_dir):
+                self.logger.error(f"Music style directory not found: {style_dir}")
+                return None
+                
+            music_files = [f for f in os.listdir(style_dir) 
+                          if f.endswith(('.mp3', '.wav'))]
+            
+            if not music_files:
+                self.logger.error(f"No music files found in {style_dir}")
+                return None
+                
+            return os.path.join(style_dir, random.choice(music_files))
+        except Exception as e:
+            self.logger.error(f"Error selecting music track: {e}")
+            return None
+
+    def create_background_music(self, video_duration):
+        """Crea una pista de música de fondo que coincida con la duración del video"""
+        try:
+            music_path = self.get_random_music_track()
+            if not music_path:
+                return None
+
+            self.logger.info(f"Creating background music from: {music_path}")
+            original_music = AudioFileClip(music_path)
+            style_config = config.MUSIC_CONFIG['styles'][self.music_style]
+
+            # Si necesitamos hacer loop
+            if original_music.duration < video_duration:
+                loops_needed = int(video_duration / original_music.duration) + 1
+                self.logger.info(f"Music loop needed: {loops_needed} repetitions")
+                
+                music_clips = []
+                total_duration = 0
+                
+                while total_duration < video_duration:
+                    clip = original_music.copy()
+                    clip = clip.with_start(total_duration)
+                    
+                    remaining_duration = video_duration - total_duration
+                    if clip.duration > remaining_duration:
+                        clip.duration = remaining_duration
+                        clip.end = clip.start + remaining_duration
+                    
+                    # Aplicar volumen configurado
+                    clip = clip.with_effects([afx.MultiplyVolume(style_config['volume'])])
+                    music_clips.append(clip)
+                    total_duration += clip.duration
+
+                final_music = CompositeAudioClip(music_clips)
+            else:
+                # Si la música es más larga que el video
+                final_music = original_music.copy()
+                final_music.duration = video_duration
+                final_music.end = video_duration
+                final_music = final_music.with_effects([afx.MultiplyVolume(style_config['volume'])])
+
+            original_music.close()
+            return final_music
+            
+        except Exception as e:
+            self.logger.error(f"Error creating background music: {e}")
+            if 'original_music' in locals():
+                original_music.close()
+            return None
+
     def combine_chapter_videos(self, video_paths):
-        """Combine multiple video files into one with transitions"""
+        """
+        Combine multiple video files into one with transitions and background music.
+
+        Args:
+            video_paths (list): List of paths to chapter video files.
+
+        Returns:
+            str: Path to the final combined video file if successful.
+            None: If the process fails.
+        """
+        video_clips = []
+        final_clips = []
+        final_video = None
+        
         try:
             output_video = os.path.join(
                 self.project_manager.get_path('video'),
@@ -285,44 +371,64 @@ class VideoGenerator:
             )
             
             self.logger.info("Loading video clips...")
-            video_clips = [VideoFileClip(path) for path in video_paths]
-            final_clips = []
+            # Cargar todos los clips de video
+            for path in video_paths:
+                clip = VideoFileClip(path)
+                video_clips.append(clip)
             
+            # Aplicar transiciones
             self.logger.info("Applying transitions between chapters...")
-            for i in range(len(video_clips)):
-                if i == 0:
-                    # El primer clip se añade sin transición de entrada
-                    final_clips.append(video_clips[i])
-                    continue
-                    
-                # Aplicar transición entre clips
+            final_clips.append(video_clips[0])
+            
+            for i in range(1, len(video_clips)):
                 prev_clip, current_clip = self.apply_random_transition(
                     final_clips[-1],
                     video_clips[i]
                 )
-                
-                # Actualizar el clip anterior con la transición
                 final_clips[-1] = prev_clip
-                # Añadir el nuevo clip con su transición
                 final_clips.append(current_clip)
             
+            # Combinar clips con transiciones
             self.logger.info("Concatenating clips with transitions...")
             final_video = concatenate_videoclips(final_clips, method="compose")
             
+            # Añadir música de fondo
+            background_music = self.create_background_music(final_video.duration)
+            if background_music:
+                self.logger.info("Adding background music...")
+                audio_clips = []
+                
+                if final_video.audio is not None:
+                    audio_clips.append(final_video.audio)
+                
+                audio_clips.append(background_music)
+                final_audio = CompositeAudioClip(audio_clips)
+                final_video.audio = final_audio
+
+            # Guardar video final
             self.logger.info("Writing final video...")
             final_video.write_videofile(
-                output_video,
+                output_video, 
                 fps=config.VIDEO_FPS,
                 codec=config.VIDEO_CODECS['video'],
                 audio_codec=config.VIDEO_CODECS['audio']
             )
-            
-            # Cerrar los clips
-            for clip in video_clips + final_clips:
-                clip.close()
             
             return output_video
             
         except Exception as e:
             self.logger.error(f"Error combining videos: {e}")
             return None
+            
+        finally:
+            # Cleanup resources
+            try:
+                for clip in video_clips:
+                    if clip: clip.close()
+                for clip in final_clips:
+                    if clip: clip.close()
+                if final_video: final_video.close()
+                if 'background_music' in locals() and background_music:
+                    background_music.close()
+            except Exception as e:
+                self.logger.warning(f"Error during cleanup: {e}")
