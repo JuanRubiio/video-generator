@@ -96,7 +96,9 @@ class PollinationsAPI:
                 'height': IMAGE_HEIGHT,
                 'nologo': 'true',
                 'private': 'false',
-                'referrer': self.referrer
+                'referrer': self.referrer,
+                'seed': int.from_bytes(os.urandom(4), 'big'),
+                'enhance': 'true'
             }
 
             async with aiohttp.ClientSession() as session:
@@ -125,7 +127,7 @@ class PollinationsAPI:
 
         self.logger.info(f"Generating image for scene: {scene_description}")
         return await self.generate_and_save_image_to_path(
-            f"cinematic scene: {scene_description}, atmospheric horror, dark mood lighting",
+            f"cinematic scene: {scene_description}. Dramatic lighting, high contrast, cinematic style",
             os.path.join(
                 self.project_manager.get_path('images'),
                 f"chapter_{len(os.listdir(self.project_manager.get_path('images'))) + 1}.png"

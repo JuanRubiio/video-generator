@@ -174,7 +174,13 @@ class VideoGenerator:
                 clips_de_subtitulos = self.crear_clips_de_subtitulos(subtitulos)
                 video_final = CompositeVideoClip([video_principal] + clips_de_subtitulos, size=self.VIDEO_SIZE)
                 video_final.audio = audio_clip  # Asigna el audio aquí
-                video_final.write_videofile(output_video, fps=24, codec='libx264', audio_codec='aac')
+                video_final.write_videofile(
+                    output_video, 
+                    fps=config.VIDEO_FPS,
+                    codec=config.VIDEO_CODECS['video'],
+                    audio_codec=config.VIDEO_CODECS['audio'],
+                    threads=8  # Puedes ajustar este valor según la cantidad de núcleos de tu CPU
+                )
                 logging.info(f"Video '{output_video}' creado exitosamente.")
                 return output_video
             else:
@@ -350,47 +356,71 @@ class VideoGenerator:
             return None
 
     def combine_chapter_videos(self, video_paths):
-        """
-        Combine multiple video files into one with transitions and background music.
-
-        Args:
-            video_paths (list): List of paths to chapter video files.
-
-        Returns:
-            str: Path to the final combined video file if successful.
-            None: If the process fails.
-        """
+        """Combine multiple video files into one with transitions and background music"""
         video_clips = []
         final_clips = []
         final_video = None
+        temp_files = []
         
         try:
+            if not video_paths:
+                self.logger.error("No video paths provided")
+                return None
+                
             output_video = os.path.join(
                 self.project_manager.get_path('video'),
                 "final_video.mp4"
             )
             
-            self.logger.info("Loading video clips...")
+            self.logger.info(f"Loading {len(video_paths)} video clips...")
             # Cargar todos los clips de video
             for path in video_paths:
+                if not os.path.exists(path):
+                    self.logger.error(f"Video file not found: {path}")
+                    return None
+                    
                 clip = VideoFileClip(path)
+                if clip is None:
+                    self.logger.error(f"Failed to load video clip: {path}")
+                    return None
+                    
                 video_clips.append(clip)
+            
+            self.logger.info(f"Successfully loaded {len(video_clips)} video clips")
             
             # Aplicar transiciones
             self.logger.info("Applying transitions between chapters...")
-            final_clips.append(video_clips[0])
+            if len(video_clips) > 0:
+                final_clips.append(video_clips[0])
+                
+                for i in range(1, len(video_clips)):
+                    self.logger.debug(f"Applying transition between clips {i-1} and {i}")
+                    prev_clip, current_clip = self.apply_random_transition(
+                        final_clips[-1],
+                        video_clips[i]
+                    )
+                    
+                    if prev_clip is None or current_clip is None:
+                        self.logger.error("Failed to apply transition")
+                        return None
+                        
+                    final_clips[-1] = prev_clip
+                    final_clips.append(current_clip)
             
-            for i in range(1, len(video_clips)):
-                prev_clip, current_clip = self.apply_random_transition(
-                    final_clips[-1],
-                    video_clips[i]
-                )
-                final_clips[-1] = prev_clip
-                final_clips.append(current_clip)
-            
+            # Validar clips finales
+            if not final_clips:
+                self.logger.error("No clips to concatenate")
+                return None
+                
             # Combinar clips con transiciones
-            self.logger.info("Concatenating clips with transitions...")
+            self.logger.info(f"Concatenating {len(final_clips)} clips with transitions...")
             final_video = concatenate_videoclips(final_clips, method="compose")
+            
+            if final_video is None:
+                self.logger.error("Failed to concatenate video clips")
+                return None
+                
+            self.logger.info(f"Final video duration: {final_video.duration} seconds")
             
             # Añadir música de fondo
             background_music = self.create_background_music(final_video.duration)
@@ -405,30 +435,48 @@ class VideoGenerator:
                 final_audio = CompositeAudioClip(audio_clips)
                 final_video.audio = final_audio
 
+            # Validar video final antes de escribir
+            if final_video is None or not hasattr(final_video, 'get_frame'):
+                self.logger.error("Invalid final video object")
+                return None
+
             # Guardar video final
-            self.logger.info("Writing final video...")
+            self.logger.info(f"Writing final video to {output_video}...")
             final_video.write_videofile(
                 output_video, 
                 fps=config.VIDEO_FPS,
                 codec=config.VIDEO_CODECS['video'],
-                audio_codec=config.VIDEO_CODECS['audio']
+                audio_codec=config.VIDEO_CODECS['audio'],
+                threads=8  # Puedes ajustar este valor según la cantidad de núcleos de tu CPU
             )
             
+            self.logger.info("Video file written successfully")
             return output_video
             
         except Exception as e:
             self.logger.error(f"Error combining videos: {e}")
+            self.logger.error(f"Error details:", exc_info=True)
             return None
             
         finally:
             # Cleanup resources
             try:
                 for clip in video_clips:
-                    if clip: clip.close()
+                    if clip and hasattr(clip, 'close'): 
+                        clip.close()
                 for clip in final_clips:
-                    if clip: clip.close()
-                if final_video: final_video.close()
+                    if clip and hasattr(clip, 'close'): 
+                        clip.close()
+                if final_video and hasattr(final_video, 'close'): 
+                    final_video.close()
                 if 'background_music' in locals() and background_music:
                     background_music.close()
+                    
+                # Limpiar archivos temporales
+                for temp_file in temp_files:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                        self.logger.debug(f"Removed temporary file: {temp_file}")
+                        
             except Exception as e:
                 self.logger.warning(f"Error during cleanup: {e}")

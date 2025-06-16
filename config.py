@@ -51,15 +51,15 @@ POLLINATIONS_CONFIG = {
     'referrer': "VideoGenerator",
     'image_base_url': "https://image.pollinations.ai",
     'text_base_url': "https://text.pollinations.ai",
-    'default_model': "flux",
+    'default_model': "turbo",
     'default_text_model': "openai"
 }
 
 THUMBNAIL_SYSTEM_PROMPT = "Create a single, impactful scene description for a YouTube thumbnail. Focus on the most dramatic or attention-grabbing elements. Maximum 50 words."
 
 
-IMAGE_WIDTH = 1920  # Width for generated images
-IMAGE_HEIGHT = 1080  # Height for generated images
+IMAGE_WIDTH = 2560  # Width for generated images
+IMAGE_HEIGHT = 1440  # Height for generated images
 
 # Retry settings
 RETRY_CONFIG = {
