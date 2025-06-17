@@ -1,13 +1,13 @@
-# Video Generator for Russian Horror Stories
+# AI-Powered Narrative Video Generator
 
-An automated system that generates and produces complete horror story videos in Russian with English subtitles.
+An automated system that generates and produces complete any gender story videos 
 
 ## Features
 
-- Story Generation in Russian
-- English Translation
+- Story Generation 
+- Any language Translation
 - Image Generation for each chapter
-- Text-to-Speech in Russian
+- Text-to-Speech 
 - Automatic Subtitling
 - Chapter-based Video Creation
 - YouTube Thumbnail Generation
@@ -95,7 +95,7 @@ project_[timestamp]/
 ## Features in Detail
 
 ### Story Generation
-- Generates horror stories in Russian
+- Generates horror stories 
 - Structures content into chapters
 - Maintains consistent narrative
 
@@ -105,8 +105,8 @@ project_[timestamp]/
 - HD quality (1920x1080)
 
 ### Audio
-- Text-to-Speech in Russian
-- Natural voice (DmitryNeural)
+- Text-to-Speech 
+- Natural voice
 - Synchronized with subtitles
 
 ### Video
