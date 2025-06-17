@@ -433,7 +433,10 @@ class VideoGenerator:
                 
                 audio_clips.append(background_music)
                 final_audio = CompositeAudioClip(audio_clips)
+                final_audio.audiopreview()
+                final_video.without_audio()
                 final_video.audio = final_audio
+                final_video.preview()
 
             # Validar video final antes de escribir
             if final_video is None or not hasattr(final_video, 'get_frame'):

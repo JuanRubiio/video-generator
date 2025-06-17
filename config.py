@@ -51,8 +51,9 @@ POLLINATIONS_CONFIG = {
     'referrer': "VideoGenerator",
     'image_base_url': "https://image.pollinations.ai",
     'text_base_url': "https://text.pollinations.ai",
-    'default_model': "turbo",
-    'default_text_model': "openai"
+    'default_model': "flux",
+    'default_text_model': "openai",
+    'bearer_token': "DmuyeVOyqJUMMBsN"
 }
 
 THUMBNAIL_SYSTEM_PROMPT = "Create a single, impactful scene description for a YouTube thumbnail. Focus on the most dramatic or attention-grabbing elements. Maximum 50 words."
@@ -70,22 +71,22 @@ RETRY_CONFIG = {
 # Video transitions
 VIDEO_TRANSITIONS = {
     'fade': {
-        'duration': 1.0,
+        'duration': 0.5,
         'color': 'black'
     },
     'fade_out_fade_in': {
-        'duration': 1.5,
+        'duration': 0.5,
         'color': 'black'
     },
     'crossfade': {
-        'duration': 1.0
+        'duration': 0.5
     },
     'slide': {
-        'duration': 1.0,
+        'duration': 0.5,
         'direction': 'left'  # left, right, up, down
     },
     'wipe': {
-        'duration': 1.0,
+        'duration': 0.5,
         'direction': 'right'
     }
 }

@@ -16,8 +16,13 @@ class PollinationsAPI:
         self.base_url_text = POLLINATIONS_CONFIG['text_base_url']
         self.project_manager = project_manager
         self.referrer = "VideoGenerator"  # Añadido el referrer faltante
-        
-        
+
+    def _get_auth_headers(self):
+        """Return headers with Bearer token for Pollinations API."""
+        return {
+            "Authorization": f"Bearer {POLLINATIONS_CONFIG['bearer_token']}"
+        }
+
     def load_system_prompt(self, prompt_file):
         """Load system prompt from a file"""
         try:
@@ -45,8 +50,9 @@ class PollinationsAPI:
             params['seed'] = seed
         if self.referrer:
             params['referrer'] = self.referrer
-            
-        async with aiohttp.ClientSession() as session:
+
+        headers = self._get_auth_headers()
+        async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(f"{self.base_url_image}/prompt/{prompt}", params=params) as response:
                 if response.status == 200:
                     return str(response.url)
@@ -77,7 +83,8 @@ class PollinationsAPI:
 
             # Make the request with the correct URL format
             url = f"{self.base_url_text}/{encoded_prompt}"
-            async with aiohttp.ClientSession() as session:
+            headers = self._get_auth_headers()
+            async with aiohttp.ClientSession(headers=headers) as session:
                 async with session.get(url, params=params) as response:
                     response.raise_for_status()
                     return await response.text()
@@ -101,7 +108,8 @@ class PollinationsAPI:
                 'enhance': 'true'
             }
 
-            async with aiohttp.ClientSession() as session:
+            headers = self._get_auth_headers()
+            async with aiohttp.ClientSession(headers=headers) as session:
                 async with session.get(f"{self.base_url_image}/prompt/{prompt}", params=params) as response:
                     if response.status == 200:
                         image_url = str(response.url)
@@ -262,7 +270,8 @@ class PollinationsAPI:
             }
 
             url = f"{self.base_url_text}/{encoded_prompt}"
-            async with aiohttp.ClientSession() as session:
+            headers = self._get_auth_headers()
+            async with aiohttp.ClientSession(headers=headers) as session:
                 async with session.get(url, params=params) as response:
                     response.raise_for_status()
                     return await response.text()
@@ -286,7 +295,8 @@ class PollinationsAPI:
             }
 
             url = f"{self.base_url_text}/{encoded_prompt}"
-            async with aiohttp.ClientSession() as session:
+            headers = self._get_auth_headers()
+            async with aiohttp.ClientSession(headers=headers) as session:
                 async with session.get(url, params=params) as response:
                     response.raise_for_status()
                     return (await response.text()).strip()
@@ -311,7 +321,8 @@ class PollinationsAPI:
             }
 
             url = f"{self.base_url_text}/{encoded_prompt}"
-            async with aiohttp.ClientSession() as session:
+            headers = self._get_auth_headers()
+            async with aiohttp.ClientSession(headers=headers) as session:
                 async with session.get(url, params=params) as response:
                     response.raise_for_status()
                     return (await response.text()).strip()
